@@ -3,7 +3,7 @@ const router = express.Router();
 const User = require('../models/user');
 const redis = require("redis");
 
-const port_redis = process.env.PORT || 6360;
+const port_redis = process.env.PORT || 6379;
 const redis_client = redis.createClient(port_redis);
 
 
@@ -32,7 +32,23 @@ router.post('/users', async (req, res) => {
     }
 });
 
-router.get('/users/:id', async (req, res) => {
+const checkCacheId = (req, res, next) => {
+    const { id } = req.params;
+
+    redis_client.get(id, (err, data) => {
+        if (err) {
+            console.log(err);
+            res.status(500).send(err);
+        }
+        if (data != null) {
+            res.send(data);
+        } else {
+            next();
+        }
+    });
+};
+
+router.get('/users/:id', checkCacheId, async (req, res) => {
     try {
         const getUser = await User.findById(req.params.id);
 
@@ -71,21 +87,59 @@ router.patch('/users/:id', async (req, res) => {
     }
 });
 
-router.get('/users/account/:accountNumber', async (req, res) => {
+const checkCacheAccount = (req, res, next) => {
+    const { accountNumber } = req.params;
+
+    redis_client.get(accountNumber, (err, data) => {
+        if (err) {
+            console.log(err);
+            res.status(500).send(err);
+        }
+        if (data != null) {
+            res.send(data);
+        } else {
+            next();
+        }
+    });
+};
+
+router.get('/users/account/:accountNumber', checkCacheAccount, async (req, res) => {
     try {
-        const getAccount = await User.find({accountNumber: req.params.accountNumber});
+        const getAccount = await User.find({ accountNumber: req.params.accountNumber });
+
+        redis_client.setex(req.params.accountNumber, 3600, JSON.stringify(getAccount));
+
         res.json(getAccount);
     } catch (error) {
-        res.json({ message: error });        
+        res.json({ message: error });
     }
 });
 
-router.get('/users/identity/:identityNumber', async (req, res) => {
+const checkCacheIdentity = (req, res, next) => {
+    const { identityNumber } = req.params;
+
+    redis_client.get(identityNumber, (err, data) => {
+        if (err) {
+            console.log(err);
+            res.status(500).send(err);
+        }
+        if (data != null) {
+            res.send(data);
+        } else {
+            next();
+        }
+    });
+};
+
+router.get('/users/identity/:identityNumber', checkCacheIdentity, async (req, res) => {
     try {
-        const getIdentity = await User.find({identityNumber: req.params.identityNumber});
+        const getIdentity = await User.find({ identityNumber: req.params.identityNumber });
+
+        redis_client.setex(req.params.identityNumber, 3600, JSON.stringify(getIdentity));
+
         res.json(getIdentity);
     } catch (error) {
-        res.json({ message: error });        
+        res.json({ message: error });
     }
 });
 
